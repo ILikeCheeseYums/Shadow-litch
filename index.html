@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Card Combat</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0812; --surface: #13101e; --surface2: #1c1730;
+    --border: #3a2d5a; --accent: #c084fc; --accent2: #f59e0b;
+    --danger: #ef4444; --cyan: #06b6d4; --text: #e2d9f3;
+    --muted: #7c6b99; --gold: #fbbf24;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:'Crimson Pro',Georgia,serif;
+    background:var(--bg); color:var(--text);
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; overflow-x:hidden; position:relative;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background:radial-gradient(ellipse 80% 50% at 50% -20%,#2d1b6930 0%,transparent 70%),
+               radial-gradient(ellipse 60% 40% at 80% 80%,#1e0a3a20 0%,transparent 60%);
+    pointer-events:none; z-index:0;
+  }
+  .stars { position:fixed; inset:0; pointer-events:none; z-index:0; }
+
+  .wrapper {
+    position:relative; z-index:1; width:100%; max-width:620px;
+    padding:14px 14px 40px; display:flex; flex-direction:column;
+    align-items:center; gap:9px;
+  }
+
+  /* Title */
+  .game-title {
+    font-family:'Cinzel Decorative',serif; font-size:1.45rem;
+    background:linear-gradient(135deg,var(--gold) 0%,var(--accent) 60%,#e879f9 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text; filter:drop-shadow(0 0 12px #a855f760);
+  }
+
+  /* Top bar */
+  .top-bar { display:flex; align-items:center; justify-content:space-between; width:100%; }
+  .diff-badge {
+    font-size:0.72rem; border-radius:20px; padding:3px 13px;
+    border:1px solid; letter-spacing:0.08em; text-transform:uppercase;
+  }
+  .diff-badge.easy   { background:#052e16; border-color:#22c55e; color:#4ade80; }
+  .diff-badge.normal { background:#1e3a5f; border-color:#3b82f6; color:#93c5fd; }
+  .diff-badge.hard   { background:#4c0519; border-color:#ef4444; color:#fca5a5; }
+
+  /* Timer */
+  #timerCircle { width:42px; height:42px; position:relative; }
+  #timerCircle svg { transform:rotate(-90deg); }
+  .bg-ring { fill:none; stroke:var(--surface2); stroke-width:4; }
+  .fg-ring { fill:none; stroke:var(--accent2); stroke-width:4; stroke-linecap:round;
+             stroke-dasharray:113; stroke-dashoffset:0;
+             transition:stroke-dashoffset 0.9s linear,stroke 0.3s; }
+  #timerNum { position:absolute; inset:0; display:flex; align-items:center;
+              justify-content:center; font-family:'Cinzel Decorative',serif;
+              font-size:0.88rem; color:var(--gold); }
+
+  /* Panel */
+  .panel {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:15px; padding:12px 16px; width:100%; position:relative; overflow:hidden;
+  }
+  .panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+  .panel-name { font-family:'Cinzel Decorative',serif; font-size:0.82rem; }
+  .panel-name.enemy  { color:var(--danger); filter:drop-shadow(0 0 5px #ef444480); }
+  .panel-name.player { color:var(--cyan); }
+
+  /* Intent badge */
+  .intent-badge { border-radius:20px; padding:3px 11px; font-size:0.74rem; display:flex; align-items:center; gap:4px; }
+  .intent-badge.attack { background:#3b0d0d; border:1px solid #7f1d1d; color:#fca5a5; }
+  .intent-badge.shield { background:#0c2a3b; border:1px solid #155e75; color:#67e8f9; }
+  .intent-badge.heal   { background:#052e16; border:1px solid #166534; color:#86efac; }
+  .intent-badge.poison { background:#1a2e05; border:1px solid #3f6212; color:#bef264; }
+
+  /* Enemy art */
+  .enemy-art { font-size:3.2rem; text-align:center; margin:4px 0; filter:drop-shadow(0 0 14px #7c3aed60); }
+  .enemy-art.shake { animation:eShake 0.35s ease; }
+  @keyframes eShake {
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-8px) rotate(-3deg)}
+    40%{transform:translateX(8px) rotate(3deg)}
+    60%{transform:translateX(-5px)} 80%{transform:translateX(5px)}
+  }
+
+  /* HP bars */
+  .hp-row { display:flex; justify-content:space-between; font-size:0.74rem; color:var(--muted); margin-bottom:3px; }
+  .hp-bar { height:8px; background:#1a0a2e; border-radius:5px; overflow:hidden; border:1px solid var(--border); }
+  .hp-fill { height:100%; border-radius:5px; transition:width 0.4s ease; }
+  .hp-fill.ef { background:linear-gradient(90deg,#dc2626,#ef4444,#f87171); box-shadow:0 0 6px #ef444450; }
+  .hp-fill.pf { background:linear-gradient(90deg,#16a34a,#22c55e,#4ade80); box-shadow:0 0 6px #22c55e50; }
+
+  /* Stat pills */
+  .stat-row { display:flex; gap:8px; margin-top:5px; flex-wrap:wrap; font-size:0.76rem; }
+  .pill {
+    display:flex; align-items:center; gap:3px;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:9px; padding:2px 8px; transition:all 0.3s; color:var(--muted);
+  }
+  .pill.on-shield { border-color:var(--cyan);  color:var(--cyan); }
+  .pill.on-poison { border-color:#4ade80; color:#4ade80; }
+  .pill.on-eshield{ border-color:#a78bfa; color:#a78bfa; }
+  .pill.on-epoison{ border-color:#bef264; color:#bef264; }
+  .pill.on-combo  { border-color:#f59e0b; color:#f59e0b; }
+
+  /* Enemy hand (face-down) */
+  .enemy-hand { display:flex; justify-content:center; gap:7px; margin-top:8px; min-height:36px; align-items:flex-end; }
+  .ecard-back {
+    width:36px; height:52px; background:linear-gradient(135deg,#3b0d0d,#1c0a2e);
+    border:1px solid #7f1d1d; border-radius:7px; display:flex;
+    align-items:center; justify-content:center; font-size:1rem;
+    box-shadow:0 2px 8px #00000060; transition:all 0.3s;
+  }
+  .ecard-back.chosen {
+    border-color:#f59e0b; box-shadow:0 0 14px #f59e0b70;
+    transform:translateY(-8px) scale(1.12);
+  }
+
+  /* Section label */
+  .section-label { font-size:0.67rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); align-self:flex-start; }
+
+  /* Player cards */
+  .cards-row { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; width:100%; min-height:148px; align-items:flex-end; }
+  .card { cursor:pointer; position:relative; transform-origin:bottom center; animation:cDeal 0.4s cubic-bezier(0.34,1.56,0.64,1) both; }
+  .card:nth-child(1){animation-delay:0s} .card:nth-child(2){animation-delay:0.07s} .card:nth-child(3){animation-delay:0.14s}
+  @keyframes cDeal { from{transform:translateY(55px) scale(0.8);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+  .card:hover:not(.disabled) { transform:translateY(-13px) scale(1.07); z-index:10; }
+  .card:hover:not(.disabled) .card-inner { box-shadow:0 14px 34px #7c3aed50,0 0 16px var(--cg,#7c3aed40); }
+  .card.disabled { opacity:0.35; pointer-events:none; filter:grayscale(0.4); }
+  .card.played { animation:cPlay 0.4s ease forwards; }
+  @keyframes cPlay { to{transform:translateY(-75px) scale(0.7);opacity:0} }
+
+  .card-inner {
+    width:102px; background:linear-gradient(160deg,var(--surface2),var(--surface));
+    border:1px solid var(--cb,var(--border)); border-radius:12px;
+    padding:8px 6px 6px; text-align:center; box-shadow:0 4px 12px #00000060; transition:box-shadow 0.2s;
+  }
+  .card-img { width:82px; height:82px; object-fit:cover; border-radius:7px; display:block; margin:0 auto; }
+  .card-name { font-family:'Cinzel Decorative',serif; font-size:0.48rem; letter-spacing:0.06em; margin-top:4px; text-transform:uppercase; }
+  .card-desc { font-size:0.6rem; color:var(--muted); margin-top:2px; font-style:italic; line-height:1.3; }
+  .card-combo { font-size:0.56rem; color:#fbbf24; margin-top:2px; }
+  .vbadge {
+    position:absolute; top:5px; right:5px; width:12px; height:12px;
+    border-radius:50%; font-size:0.42rem; display:flex; align-items:center; justify-content:center;
+  }
+  .vbadge.light { background:#fef9c3; color:#92400e; }
+  .vbadge.dark  { background:#1e1b4b; color:#a5b4fc; }
+
+  /* Enemy card fly-in */
+  .ecard-anim {
+    position:fixed; z-index:250; pointer-events:none;
+    animation:ecFly 1s cubic-bezier(0.22,1,0.36,1) forwards;
+  }
+  @keyframes ecFly {
+    0%  { transform:translateY(-100px) scale(1.3) rotate(6deg); opacity:0; }
+    25% { opacity:1; }
+    65% { transform:translateY(10px) scale(1.15) rotate(-2deg); opacity:1; }
+    100%{ transform:translateY(30px) scale(0.75); opacity:0; }
+  }
+
+  /* Floating text */
+  .floating {
+    position:fixed; font-family:'Cinzel Decorative',serif; font-size:0.95rem;
+    pointer-events:none; z-index:300; white-space:nowrap; text-shadow:0 2px 8px #000a;
+    animation:fUp 1.2s cubic-bezier(0.22,1,0.36,1) forwards;
+  }
+  @keyframes fUp { 0%{transform:translateY(0);opacity:1} 100%{transform:translateY(-80px);opacity:0} }
+
+  /* Overlays */
+  #comboBanner {
+    position:fixed; top:28%; left:50%; transform:translate(-50%,-50%) scale(0);
+    background:linear-gradient(135deg,#92400e,#d97706,#f59e0b);
+    border-radius:12px; padding:9px 26px; font-family:'Cinzel Decorative',serif;
+    font-size:1.15rem; color:#fff; z-index:270; pointer-events:none;
+    box-shadow:0 0 40px #f59e0b80; transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  #comboBanner.show { transform:translate(-50%,-50%) scale(1); }
+
+  /* Game Over */
+  #gameOver { position:fixed; inset:0; background:#000000b0; display:none; align-items:center; justify-content:center; z-index:400; backdrop-filter:blur(6px); }
+  #gameOver.show { display:flex; }
+  .go-box { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:34px 46px; text-align:center; animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1); box-shadow:0 0 60px #7c3aed40; }
+  @keyframes popIn { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
+  #resultText { font-family:'Cinzel Decorative',serif; font-size:1.75rem; margin-bottom:5px; }
+  .result-sub { color:var(--muted); font-style:italic; margin-bottom:16px; }
+
+  /* Difficulty screen */
+  #diffScreen { position:fixed; inset:0; background:#000000d0; display:flex; align-items:center; justify-content:center; z-index:500; backdrop-filter:blur(8px); }
+  .diff-box { background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:36px 44px; text-align:center; animation:popIn 0.4s ease; }
+  .diff-box h2 { font-family:'Cinzel Decorative',serif; font-size:1.3rem; background:linear-gradient(135deg,var(--gold),var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px; }
+  .diff-box p { color:var(--muted); font-style:italic; margin-bottom:22px; font-size:0.88rem; }
+  .diff-opts { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .dopt { border-radius:13px; padding:15px 20px; cursor:pointer; border:2px solid; transition:all 0.2s; min-width:125px; }
+  .dopt:hover { transform:translateY(-4px); filter:brightness(1.1); }
+  .dopt .di { font-size:1.8rem; margin-bottom:5px; }
+  .dopt .dn { font-family:'Cinzel Decorative',serif; font-size:0.7rem; letter-spacing:0.05em; }
+  .dopt .dd { font-size:0.68rem; color:var(--muted); margin-top:3px; line-height:1.4; }
+  .dopt.easy   { background:#052e16; border-color:#22c55e; } .dopt.easy .dn   { color:#4ade80; }
+  .dopt.normal { background:#1e3a5f; border-color:#3b82f6; } .dopt.normal .dn { color:#93c5fd; }
+  .dopt.hard   { background:#4c0519; border-color:#ef4444; } .dopt.hard .dn   { color:#fca5a5; }
+
+  /* Button */
+  .btn { background:linear-gradient(135deg,#6d28d9,#7c3aed); color:#fff; border:none; border-radius:10px; padding:9px 24px; font-family:'Cinzel Decorative',serif; font-size:0.78rem; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 14px #7c3aed50; }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 8px 22px #7c3aed70; }
+
+  /* Battle log */
+  #battleLog { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:11px; padding:7px 11px; max-height:72px; overflow-y:auto; font-size:0.74rem; color:var(--muted); font-style:italic; line-height:1.6; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+
+  /* Flash */
+  @keyframes rFlash { 0%,100%{background-color:transparent} 50%{background-color:#ef444422} }
+  .flashing { animation:rFlash 0.3s ease; }
+</style>
+</head>
+<body>
+
+<canvas class="stars" id="starCanvas"></canvas>
+
+<!-- ── DIFFICULTY SCREEN ── -->
+<div id="diffScreen">
+  <div class="diff-box">
+    <h2>⚔ Card Combat</h2>
+    <p>Choose your challenge</p>
+    <div class="diff-opts">
+      <div class="dopt easy"   onclick="chooseDiff('easy')">
+        <div class="di">🌿</div><div class="dn">Easy</div>
+        <div class="dd">Enemy plays randomly. Learn the cards.</div>
+      </div>
+      <div class="dopt normal" onclick="chooseDiff('normal')">
+        <div class="di">⚔</div><div class="dn">Normal</div>
+        <div class="dd">Enemy plays smart half the time.</div>
+      </div>
+      <div class="dopt hard"   onclick="chooseDiff('hard')">
+        <div class="di">💀</div><div class="dn">Hard</div>
+        <div class="dd">Enemy always picks the optimal card.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN UI ── -->
+<div class="wrapper">
+  <h1 class="game-title">⚔ Card Combat</h1>
+
+  <div class="top-bar">
+    <span class="diff-badge normal" id="diffBadge">Normal</span>
+    <div style="display:flex;align-items:center;gap:9px">
+      <div id="timerCircle">
+        <svg width="42" height="42" viewBox="0 0 40 40">
+          <circle class="bg-ring" cx="20" cy="20" r="18"/>
+          <circle class="fg-ring" id="timerRing" cx="20" cy="20" r="18"/>
+        </svg>
+        <div id="timerNum">5</div>
+      </div>
+      <span style="font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em">Your Turn</span>
+    </div>
+  </div>
+
+  <!-- Enemy Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-name enemy">👁 Shadow Lich</div>
+      <div class="intent-badge attack" id="intentBadge">⚔ <span id="intentText">…</span></div>
+    </div>
+    <div class="enemy-art" id="enemyArt">💀</div>
+    <div class="hp-row"><span>HP</span><span><span id="enemyHP">100</span> / <span id="enemyMaxHP">100</span></span></div>
+    <div class="hp-bar"><div class="hp-fill ef" id="enemyBar" style="width:100%"></div></div>
+    <div class="stat-row">
+      <div class="pill" id="eShPill">🛡 <span id="eShield">0</span></div>
+      <div class="pill" id="ePoPill">☠ <span id="ePoison">0</span></div>
+    </div>
+    <div class="enemy-hand" id="enemyHand"></div>
+  </div>
+
+  <!-- Player Panel -->
+  <div class="panel">
+    <div class="panel-header"><div class="panel-name player">🧙 Hero of Light</div></div>
+    <div class="hp-row"><span>HP</span><span><span id="playerHP">100</span> / 100</span></div>
+    <div class="hp-bar"><div class="hp-fill pf" id="playerBar" style="width:100%"></div></div>
+    <div class="stat-row">
+      <div class="pill" id="shPill">🛡 <span id="shield">0</span></div>
+      <div class="pill" id="poPill">☠ <span id="poisonVal">0</span></div>
+      <div class="pill" id="comboPill" style="display:none">🔥 COMBO READY</div>
+    </div>
+  </div>
+
+  <div class="section-label">Your Hand — Choose a Card</div>
+  <div class="cards-row" id="cards"></div>
+  <div id="battleLog">A new battle begins…</div>
+</div>
+
+<div id="comboBanner">🔥 COMBO!</div>
+
+<div id="gameOver">
+  <div class="go-box">
+    <div id="resultText"></div>
+    <div class="result-sub" id="resultSub"></div>
+    <button class="btn" onclick="showDiffScreen()">⚔ Play Again</button>
+  </div>
+</div>
+
+<audio id="bgm" src="crystalwave.wav" loop></audio>
+
+<script>
+// ══ STARS ══════════════════════════════════════
+(function(){
+  const cv=document.getElementById('starCanvas'),ctx=cv.getContext('2d');let st=[];
+  function r(){cv.width=innerWidth;cv.height=innerHeight;st=Array.from({length:120},()=>({x:Math.random()*cv.width,y:Math.random()*cv.height,r:Math.random()*1.2+0.2,a:Math.random(),da:(Math.random()-0.5)*0.008}));}
+  r();addEventListener('resize',r);
+  (function d(){ctx.clearRect(0,0,cv.width,cv.height);st.forEach(s=>{s.a=Math.max(0.1,Math.min(1,s.a+s.da));if(s.a<=0.1||s.a>=1)s.da*=-1;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,180,255,${s.a})`;ctx.fill();});requestAnimationFrame(d);})();
+})();
+
+// ══ AUDIO ══════════════════════════════════════
+let _ac=null, musicOn=false;
+function ac(){if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();return _ac;}
+function t(f,tp,d,v,dl=0){const c=ac(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.type=tp;o.frequency.setValueAtTime(f,c.currentTime+dl);g.gain.setValueAtTime(v,c.currentTime+dl);g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dl+d);o.start(c.currentTime+dl);o.stop(c.currentTime+dl+d+0.05);}
+const SFX={
+  sword:()=>{t(880,'sawtooth',0.08,0.3);t(440,'square',0.15,0.15,0.05);t(220,'sawtooth',0.12,0.1,0.1);},
+  dsword:()=>{t(220,'sawtooth',0.2,0.4);t(110,'sawtooth',0.3,0.3,0.05);t(55,'square',0.4,0.2,0.1);},
+  shield:()=>{t(660,'square',0.06,0.2);t(1320,'square',0.1,0.15,0.05);},
+  heal:()=>{[523,659,784,1047].forEach((f,i)=>t(f,'sine',0.3,0.2,i*0.07));},
+  poison:()=>{t(300,'sawtooth',0.1,0.2);t(250,'sawtooth',0.15,0.15,0.08);t(180,'sawtooth',0.2,0.1,0.16);},
+  clock:()=>{t(800,'sine',0.12,0.3);t(800,'sine',0.12,0.3,0.18);},
+  cat:()=>{[400,500,450,600].forEach((f,i)=>t(f,'sine',0.12,0.15,i*0.05));},
+  combo:()=>{[523,659,784,1047,1319].forEach((f,i)=>t(f,'triangle',0.2,0.25,i*0.06));},
+  enemy:()=>{t(150,'sawtooth',0.2,0.4);t(80,'square',0.35,0.3,0.05);t(60,'sawtooth',0.3,0.2,0.1);},
+  flip:()=>{t(400,'sine',0.06,0.15);t(600,'sine',0.08,0.1,0.04);},
+  lose:()=>{[440,415,392,349,330].forEach((f,i)=>t(f,'sine',0.5,0.3,i*0.12));},
+  win:()=>{[523,659,784,1047,784,1047,1319].forEach((f,i)=>t(f,'triangle',0.3,0.3,i*0.12));}
+};
+function startMusic(){
+  if(musicOn)return; musicOn=true;
+  const b=document.getElementById('bgm'); b.volume=0;
+  b.play().then(()=>{let v=0;const f=setInterval(()=>{v=Math.min(v+0.04,0.3);b.volume=v;if(v>=0.3)clearInterval(f);},100);}).catch(()=>{});
+}
+
+// ══ CARD DEFINITIONS ══════════════════════════
+const META={
+  sword: {emoji:'⚔️',name:'Sword', color:'#f87171',glow:'#ef444460',light:'Deal 6 dmg',dark:'Deal 12 dmg, −2 HP'},
+  shield:{emoji:'🛡️',name:'Shield',color:'#67e8f9',glow:'#06b6d460',light:'Block 6',   dark:'Block 10'},
+  frog:  {emoji:'🐸',name:'Frog',  color:'#4ade80',glow:'#22c55e60',light:'+2 Poison', dark:'+4 Poison'},
+  heart: {emoji:'❤️',name:'Heart', color:'#f9a8d4',glow:'#ec489960',light:'Heal 8',    dark:'Heal 15'},
+  clock: {emoji:'⏳',name:'Clock', color:'#fde68a',glow:'#f59e0b60',light:'+2s / dmg', dark:'Deal 5 dmg'},
+  cat:   {emoji:'🐱',name:'Cat',   color:'#d8b4fe',glow:'#a855f760',light:'3dmg+heal', dark:'6dmg,−3 HP'},
+};
+const ALL=Object.keys(META).flatMap(k=>[{type:k,variant:'light'},{type:k,variant:'dark'}]);
+
+// ══ STATE ══════════════════════════════════════
+let diff='normal';
+let eHP,eMaxHP,pHP;
+let pShield,pPoison,eShield,ePoison;
+let lastPType,lastEType;
+let playerTurn,timeLeft,timer;
+let pHand,eHand,eChosen;
+
+// ══ DIFFICULTY SCREEN ══════════════════════════
+function showDiffScreen(){
+  document.getElementById('gameOver').classList.remove('show');
+  document.getElementById('diffScreen').style.display='flex';
+}
+function chooseDiff(d){
+  diff=d;
+  document.getElementById('diffScreen').style.display='none';
+  const b=document.getElementById('diffBadge');
+  b.className='diff-badge '+d;
+  b.textContent=d.charAt(0).toUpperCase()+d.slice(1);
+  startGame();
+}
+
+// ══ GAME INIT ══════════════════════════════════
+function startGame(){
+  eHP=100;eMaxHP=100;pHP=100;
+  pShield=0;pPoison=0;eShield=0;ePoison=0;
+  lastPType=null;lastEType=null;playerTurn=false;
+  document.getElementById('gameOver').classList.remove('show');
+  document.getElementById('battleLog').innerHTML='<div>A new battle begins…</div>';
+  nextTurn();
+}
+
+// ══ TURN ══════════════════════════════════════
+function nextTurn(){
+  if(chkOver())return;
+  pHand=deal3(); eHand=deal3();
+  eChosen=pickEnemy(eHand);
+  renderP(); renderEHand(); showIntent(eChosen);
+  updateUI();
+  log('🃏 New round — choose your card!');
+  playerTurn=true; timeLeft=5;
+  clearInterval(timer);
+  timer=setInterval(()=>{timeLeft--;updateUI();if(timeLeft<=0){clearInterval(timer);timeOut();}},1000);
+}
+function timeOut(){
+  log('⏰ Time\'s up!');
+  resolveRound(null,pHand[Math.floor(Math.random()*pHand.length)]);
+}
+
+// ══ PLAYER PLAYS ══════════════════════════════
+function playCard(el,card){
+  if(!playerTurn)return;
+  playerTurn=false; clearInterval(timer);
+  startMusic(); el.classList.add('played');
+  resolveRound(el,card);
+}
+
+// ══ RESOLVE ROUND ══════════════════════════════
+function resolveRound(el,pCard){
+  document.querySelectorAll('#cards .card').forEach(c=>c.classList.add('disabled'));
+  const pCombo=(lastPType===pCard.type);
+  const eCombo=(lastEType===eChosen.type);
+
+  // Highlight which enemy card was chosen
+  highlightECard(eChosen);
+
+  setTimeout(()=>{
+    // Player card
+    if(pCombo){showCombo();SFX.combo();}
+    applyEffect(pCard,pCombo,'player');
+    lastPType=pCard.type;
+    updateUI(); if(chkOver())return;
+
+    // Enemy card (delayed)
+    setTimeout(()=>{
+      flyECard(eChosen); SFX.flip();
+      setTimeout(()=>{
+        applyEffect(eChosen,eCombo,'enemy');
+        lastEType=eChosen.type;
+        updateUI(); if(!chkOver()) setTimeout(nextTurn,950);
+      },600);
+    },650);
+  },180);
+}
+
+// ══ EFFECT ENGINE ══════════════════════════════
+function applyEffect(card,combo,side){
+  const isP=(side==='player');
+  const tp=card.type, v=card.variant;
+
+  // Poison tick at start of the affected side's turn
+  if(isP && pPoison>0){
+    pHP=Math.max(0,pHP-pPoison);
+    float(`☠ −${pPoison}`,'#4ade80',false);
+    log(`☠ Poison burns you for ${pPoison}!`);
+  }
+  if(!isP && ePoison>0){
+    eHP=Math.max(0,eHP-ePoison);
+    float(`☠ −${ePoison}`,'#bef264',true);
+    shake(); log(`☠ Poison burns Lich for ${ePoison}!`);
+  }
+
+  function dmg(d){
+    if(isP){
+      const blk=Math.min(eShield,d); eShield-=blk; const act=d-blk;
+      eHP=Math.max(0,eHP-act);
+      if(blk)float(`🛡 ${blk}`,'#a78bfa',true);
+      if(act){float(`⚔ −${act}`,'#ef4444',true);shake();}
+      log(`⚔ You deal ${act} dmg${blk?` (${blk} blocked)`:''}!`);
+      SFX.sword();
+    } else {
+      const blk=Math.min(pShield,d); pShield-=blk; const act=d-blk;
+      pHP=Math.max(0,pHP-act);
+      if(blk)float(`🛡 ${blk}`,'#67e8f9',false);
+      if(act){float(`−${act}`,'#ef4444',false);flashBg();}
+      log(`💥 Lich deals ${act} dmg${blk?` (${blk} blocked)`:''}!`);
+      SFX.enemy();
+    }
+  }
+  function heal(h){
+    if(isP){pHP=Math.min(100,pHP+h);float(`❤ +${h}`,'#4ade80',false);log(`❤ You heal ${h} HP.`);}
+    else   {eHP=Math.min(eMaxHP,eHP+h);float(`🩸+${h}`,'#f9a8d4',true);log(`🩸 Lich heals ${h} HP.`);}
+    SFX.heal();
+  }
+  function blk(s){
+    if(isP){pShield+=s;float(`🛡 +${s}`,'#67e8f9',false);log(`🛡 You gain ${s} shield.`);}
+    else   {eShield+=s;float(`🛡 +${s}`,'#a78bfa',true);log(`🛡 Lich gains ${s} shield.`);}
+    SFX.shield();
+  }
+  function psn(p){
+    // Poison stacks on the OPPONENT
+    if(isP){ePoison+=p;float(`☠ +${p}`,'#bef264',true);log(`☠ Lich poisoned (+${p})!`);}
+    else   {pPoison+=p;float(`☠ +${p}`,'#4ade80',false);log(`☠ You are poisoned (+${p})!`);}
+    SFX.poison();
+  }
+  function self(d){
+    if(isP){pHP=Math.max(0,pHP-d);float(`−${d} self`,'#f87171',false);}
+    else   {eHP=Math.max(0,eHP-d);}
+  }
+
+  if(v==='light'){
+    if(tp==='sword') dmg(combo?10:6);
+    if(tp==='shield')blk(combo?10:6);
+    if(tp==='frog')  psn(combo?4:2);
+    if(tp==='heart') heal(combo?12:8);
+    if(tp==='clock'){
+      if(isP){timeLeft+=combo?4:2;float(`⏳ +${combo?4:2}s`,'#fde68a',false);SFX.clock();log(`⏳ +${combo?4:2}s!`);}
+      else   {dmg(combo?8:5);SFX.clock();}
+    }
+    if(tp==='cat'){dmg(3);heal(3);SFX.cat();}
+  } else {
+    if(tp==='sword') {dmg(combo?18:12);self(2);if(isP)log('🩸 Dark blade cuts you for 2.');}
+    if(tp==='shield')blk(combo?18:10);
+    if(tp==='frog')  psn(combo?6:4);
+    if(tp==='heart') heal(combo?20:15);
+    if(tp==='clock') {dmg(combo?10:5);SFX.clock();}
+    if(tp==='cat')   {dmg(6);self(3);SFX.cat();if(isP)log('🩸 Dark cat scratches you for 3.');}
+  }
+}
+
+// ══ ENEMY AI ══════════════════════════════════
+function pickEnemy(hand){
+  if(diff==='easy')  return hand[Math.floor(Math.random()*hand.length)];
+  if(diff==='normal')return Math.random()<0.5 ? hand[Math.floor(Math.random()*hand.length)] : bestCard(hand);
+  return bestCard(hand);
+}
+
+function scoreCard(card){
+  const tp=card.type, v=card.variant;
+  const combo=(lastEType===tp);
+  let s=0;
+  function effDmg(d){return Math.max(0,d-pShield);}
+
+  if(v==='light'){
+    if(tp==='sword') s=effDmg(combo?10:6)*1.6;
+    if(tp==='shield')s=(combo?10:6)*0.9+(pPoison>0?7:0);
+    if(tp==='frog')  s=(combo?4:2)*2.8;
+    if(tp==='heart'){const hv=combo?12:8; s=hv*(1-eHP/eMaxHP)*3;}
+    if(tp==='clock') s=effDmg(combo?8:5)*1.5;
+    if(tp==='cat')   s=effDmg(3)+3*(1-eHP/eMaxHP)*2;
+  } else {
+    if(tp==='sword') s=effDmg(combo?18:12)*1.6-2;
+    if(tp==='shield')s=(combo?18:10)*0.95+(pPoison>0?9:0);
+    if(tp==='frog')  s=(combo?6:4)*2.8;
+    if(tp==='heart'){const hv=combo?20:15; s=hv*(1-eHP/eMaxHP)*3;}
+    if(tp==='clock') s=effDmg(combo?10:5)*1.5;
+    if(tp==='cat')   s=effDmg(6)-3;
+  }
+
+  if(combo) s*=1.35;
+  // Lethal bonus
+  const lv=v==='light'?effDmg(tp==='sword'?combo?10:6:0):effDmg(tp==='sword'?combo?18:12:0);
+  if(lv>=pHP) s+=1000;
+  if(tp==='heart' && eHP<eMaxHP*0.3) s+=20;
+  if(tp==='shield' && pPoison>=3)    s+=12;
+  return s;
+}
+
+function bestCard(hand){
+  let best=hand[0],bs=-Infinity;
+  hand.forEach(c=>{const sc=scoreCard(c);if(sc>bs){bs=sc;best=c;}});
+  return best;
+}
+
+// ══ INTENT ════════════════════════════════════
+function showIntent(card){
+  const m=META[card.type], isCombo=(lastEType===card.type);
+  let cls='attack',icon='⚔';
+  if(card.type==='shield'){cls='shield';icon='🛡';}
+  if(card.type==='heart') {cls='heal';  icon='❤';}
+  if(card.type==='frog')  {cls='poison';icon='☠';}
+  const b=document.getElementById('intentBadge');
+  b.className='intent-badge '+cls;
+  b.innerHTML=`${icon} ${m.name}${isCombo?' 🔥':''}`;
+}
+
+// ══ DRAW ══════════════════════════════════════
+function deal3(){
+  const pool=[...ALL],h=[];
+  for(let i=0;i<3;i++){const x=Math.floor(Math.random()*pool.length);h.push(pool[x]);pool.splice(x,1);}
+  return h;
+}
+
+// ══ RENDER PLAYER CARDS ════════════════════════
+function renderP(){
+  const c=document.getElementById('cards'); c.innerHTML='';
+  pHand.forEach(card=>{
+    const m=META[card.type],combo=(lastPType===card.type);
+    const div=document.createElement('div');
+    div.className='card';
+    div.style.setProperty('--cg',m.glow);
+    div.style.setProperty('--cb',combo?'#f59e0b':'var(--border)');
+    const img=`cards-${card.variant}-${card.type}.png`;
+    const desc=card.variant==='light'?m.light:m.dark;
+    div.innerHTML=`<div class="card-inner">
+      <span class="vbadge ${card.variant}">${card.variant==='light'?'☀':'🌑'}</span>
+      <img class="card-img" src="${img}" alt="${m.name}"
+        onerror="this.outerHTML='<div style=\\'font-size:2rem;text-align:center\\'>${m.emoji}</div>'">
+      <div class="card-name" style="color:${m.color}">${m.name}</div>
+      <div class="card-desc">${desc}${combo?' ×1.5':''}</div>
+      ${combo?'<div class="card-combo">🔥 COMBO</div>':''}
+    </div>`;
+    div.onclick=()=>playCard(div,card);
+    c.appendChild(div);
+  });
+}
+
+// ══ RENDER ENEMY HAND (face-down) ══════════════
+function renderEHand(){
+  const c=document.getElementById('enemyHand'); c.innerHTML='';
+  eHand.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='ecard-back'; d.id='ec'+i; d.textContent='🂠';
+    c.appendChild(d);
+  });
+}
+function highlightECard(chosen){
+  const idx=eHand.indexOf(chosen);
+  document.querySelectorAll('.ecard-back').forEach((el,i)=>{if(i===idx)el.classList.add('chosen');});
+}
+
+// ══ ENEMY CARD FLY ANIMATION ══════════════════
+function flyECard(card){
+  const m=META[card.type];
+  const panel=document.getElementById('enemyArt').getBoundingClientRect();
+  const el=document.createElement('div');
+  el.className='ecard-anim';
+  el.style.left=(panel.left+panel.width/2-52)+'px';
+  el.style.top=(panel.bottom+8)+'px';
+  el.innerHTML=`<div style="width:104px;background:linear-gradient(160deg,#1c1730,#13101e);
+    border:2px solid ${card.variant==='dark'?'#7f1d1d':'#f59e0b'};
+    border-radius:12px;padding:8px 6px 6px;text-align:center;box-shadow:0 8px 24px #00000090">
+    <img src="cards-${card.variant}-${card.type}.png" width="86" height="86"
+      style="object-fit:cover;border-radius:7px;display:block;margin:0 auto"
+      onerror="this.outerHTML='<div style=\\'font-size:2rem\\' >${m.emoji}</div>'">
+    <div style="font-family:Cinzel Decorative,serif;font-size:0.48rem;color:${m.color};margin-top:4px;text-transform:uppercase">${m.name}</div>
+  </div>`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1100);
+}
+
+// ══ GAME OVER ══════════════════════════════════
+function chkOver(){
+  if(pHP<=0){pHP=0;updateUI();endGame('💀 Defeated','The Shadow Lich claims another soul…');SFX.lose();return true;}
+  if(eHP<=0){eHP=0;updateUI();endGame('🏆 Victory!','The Shadow Lich has been vanquished!');SFX.win();return true;}
+  return false;
+}
+function endGame(txt,sub){
+  clearInterval(timer);playerTurn=false;
+  document.getElementById('resultText').textContent=txt;
+  document.getElementById('resultSub').textContent=sub;
+  document.getElementById('gameOver').classList.add('show');
+}
+
+// ══ VISUAL HELPERS ══════════════════════════════
+function float(txt,color,upper){
+  const el=document.createElement('div'); el.className='floating'; el.style.color=color;
+  el.style.left=(28+Math.random()*28)+'%'; el.style.top=upper?'16%':'52%';
+  el.textContent=txt; document.body.appendChild(el); setTimeout(()=>el.remove(),1300);
+}
+function shake(){const a=document.getElementById('enemyArt');a.classList.remove('shake');void a.offsetWidth;a.classList.add('shake');}
+function flashBg(){document.body.classList.remove('flashing');void document.body.offsetWidth;document.body.classList.add('flashing');}
+function showCombo(){const b=document.getElementById('comboBanner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),900);}
+
+// ══ UI ════════════════════════════════════════
+function updateUI(){
+  document.getElementById('enemyHP').textContent=Math.max(0,Math.ceil(eHP));
+  document.getElementById('enemyBar').style.width=Math.max(0,(eHP/eMaxHP)*100)+'%';
+  document.getElementById('playerHP').textContent=Math.max(0,Math.ceil(pHP));
+  document.getElementById('playerBar').style.width=Math.max(0,(pHP/100)*100)+'%';
+
+  document.getElementById('shield').textContent=pShield;
+  document.getElementById('shPill').className='pill'+(pShield>0?' on-shield':'');
+  document.getElementById('poisonVal').textContent=pPoison;
+  document.getElementById('poPill').className='pill'+(pPoison>0?' on-poison':'');
+  document.getElementById('comboPill').style.display=lastPType?'flex':'none';
+
+  document.getElementById('eShield').textContent=eShield;
+  document.getElementById('eShPill').className='pill'+(eShield>0?' on-eshield':'');
+  document.getElementById('ePoison').textContent=ePoison;
+  document.getElementById('ePoPill').className='pill'+(ePoison>0?' on-epoison':'');
+
+  const C=2*Math.PI*18, frac=Math.max(0,timeLeft/5);
+  const ring=document.getElementById('timerRing');
+  ring.style.strokeDashoffset=C*(1-frac);
+  ring.style.stroke=frac>0.4?'#f59e0b':'#ef4444';
+  document.getElementById('timerNum').textContent=Math.max(0,timeLeft);
+}
+
+// ══ LOG ════════════════════════════════════════
+function log(m){const el=document.getElementById('battleLog');el.innerHTML+=`<div>${m}</div>`;el.scrollTop=el.scrollHeight;}
+</script>
+</body>
+</html>
